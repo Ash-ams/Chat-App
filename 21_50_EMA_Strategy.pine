@@ -1,0 +1,75 @@
+//@version=5
+indicator("21-50 EMA Pullback Strategy", overlay=true)
+
+// EMAs
+ema21 = ta.ema(close, 21)
+ema50 = ta.ema(close, 50)
+
+// Crossover detection
+bullCross = ta.crossover(ema21, ema50)
+bearCross = ta.crossunder(ema21, ema50)
+
+// Trend state tracking
+var int trend = 0  // 1 = uptrend, -1 = downtrend, 0 = neutral
+if bullCross
+    trend := 1
+if bearCross
+    trend := -1
+
+// Pullback state tracking
+var bool pullbackActive = false
+var bool buySignal = false
+var bool sellSignal = false
+
+// Candle strength
+strongBullishCandle = close > open and (close - open) > (high - low) * 0.3
+strongBearishCandle = close < open and (open - close) > (high - low) * 0.3
+
+// On crossover, activate pullback state
+if bullCross or bearCross
+    pullbackActive := true
+
+// Buy pullback: after bullish crossover, wait for pullback to 21 EMA, then strong bullish candle closes above 21 EMA
+if trend == 1 and pullbackActive
+    if close <= ema21
+        // In pullback zone, wait for reversal
+        if strongBullishCandle and close > ema21
+            buySignal := true
+            pullbackActive := false
+        else
+            buySignal := false
+    else
+        buySignal := false
+else
+    buySignal := false
+
+// Sell pullback: after bearish crossover, wait for pullback to 21 EMA, then strong bearish candle closes below 21 EMA
+if trend == -1 and pullbackActive
+    if close >= ema21
+        // In pullback zone, wait for reversal
+        if strongBearishCandle and close < ema21
+            sellSignal := true
+            pullbackActive := false
+        else
+            sellSignal := false
+    else
+        sellSignal := false
+else
+    sellSignal := false
+
+// Crossover signals (one per event)
+buyCrossSignal = bullCross
+sellCrossSignal = bearCross
+
+// Plot EMAs
+plot(ema21, color=color.orange, title="21 EMA", linewidth=2)
+plot(ema50, color=color.blue, title="50 EMA", linewidth=2)
+
+// Plot signals
+plotshape(buyCrossSignal, title="Buy Crossover", location=location.belowbar, color=color.lime, style=shape.triangleup, size=size.small, text="Cross Buy")
+plotshape(sellCrossSignal, title="Sell Crossover", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small, text="Cross Sell")
+plotshape(buySignal, title="Buy Pullback", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small, text="Buy")
+plotshape(sellSignal, title="Sell Pullback", location=location.abovebar, color=color.maroon, style=shape.triangledown, size=size.small, text="Sell")
+
+// Background Color for Trend
+bgcolor(trend == 1 ? color.new(color.green, 95) : trend == -1 ? color.new(color.red, 95) : na) 
